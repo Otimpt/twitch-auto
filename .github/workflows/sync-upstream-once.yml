@@ -1,0 +1,41 @@
+name: Sync upstream once
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: ${{ !contains(github.event.head_commit.message, 'Sync repository with upstream while preserving run.py') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Save run.py
+        run: cp run.py /tmp/run.py
+
+      - name: Clone upstream repository
+        run: git clone --depth 1 --branch master https://github.com/Tkd-Alex/Twitch-Channel-Points-Miner-v2.git /tmp/upstream
+
+      - name: Replace everything except run.py
+        run: |
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name run.py -exec rm -rf {} +
+          rsync -a --exclude='.git' /tmp/upstream/ ./
+          cp /tmp/run.py ./run.py
+
+      - name: Commit and push synchronized repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Sync repository with upstream while preserving run.py [skip ci]"
+          git push origin HEAD:main
